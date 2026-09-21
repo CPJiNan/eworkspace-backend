@@ -1,0 +1,1054 @@
+openapi: 3.0.3
+info:
+  title: EWorkspace API
+  description: 复旦大学未来信息创新学院宣传部工作平台 API
+  version: 1.0.0
+
+servers:
+  - url: /
+    description: Nginx 统一入口
+
+tags:
+  - name: Auth
+    description: 认证
+  - name: User
+    description: 用户
+  - name: Project
+    description: 项目
+  - name: Claim
+    description: 申领
+  - name: Tag
+    description: 标签
+  - name: Notification
+    description: 站内短信
+  - name: OperationLog
+    description: 操作日志
+
+security:
+  - bearerAuth: [ ]
+
+paths:
+  /api/health:
+    get:
+      tags: [ Auth ]
+      summary: 检查服务健康
+      security: [ ]
+      responses:
+        "200": { description: 健康检查成功 }
+
+  /api/auth/login:
+    post:
+      tags: [ Auth ]
+      summary: 用户登录
+      description: 登录不写入操作日志
+      security: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ studentId, password ]
+              properties:
+                studentId: { type: string, example: "26000000000" }
+                password:
+                  type: string
+                  example: "Fdu00000"
+                  description: 登录密码
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/AuthResult" }
+        "401":
+          description: 学号或密码错误
+        "403":
+          description: 账号已被封禁
+
+  /api/auth/refresh:
+    post:
+      tags: [ Auth ]
+      summary: 续期访问令牌
+      security: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ refreshToken ]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200":
+          description: 续期成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/AuthResult" }
+        "401": { description: 令牌无效或已撤销 }
+
+  /api/auth/logout:
+    post:
+      tags: [ Auth ]
+      summary: 用户登出
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200": { description: 登出成功 }
+
+  /api/auth/me:
+    get:
+      tags: [ Auth ]
+      summary: 获取本人登录信息
+      responses:
+        "200":
+          description: 获取登录信息成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/User" }
+
+  /api/auth/password:
+    post:
+      tags: [ Auth ]
+      summary: 修改本人密码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ oldPassword, newPassword ]
+              properties:
+                oldPassword: { type: string }
+                newPassword:
+                  type: string
+                  description: 新密码至少 8 位且含字母与数字
+      responses:
+        "200": { description: 修改密码成功 }
+        "400": { description: 当前密码错误或新密码强度不足 }
+
+  /api/users/me:
+    get:
+      tags: [ User ]
+      summary: 获取本人信息
+      responses:
+        "200":
+          description: 获取本人信息成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/User" }
+    patch:
+      tags: [ User ]
+      summary: 修改本人信息
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 50 }
+                phone: { type: string, example: "10000000000" }
+                wechat: { type: string, maxLength: 50 }
+                qq: { type: string, maxLength: 20 }
+                email: { type: string, example: "26000000000@m.fudan.edu.cn" }
+      responses:
+        "200": { description: 修改本人信息成功 }
+
+  /api/projects:
+    get:
+      tags: [ Project ]
+      summary: 获取项目列表
+      parameters:
+        - name: keyword
+          in: query
+          description: 搜索关键字
+          schema: { type: string }
+        - name: semesterId
+          in: query
+          schema: { type: integer }
+        - name: tagId
+          in: query
+          schema: { type: integer }
+        - name: status
+          in: query
+          description: 状态筛选
+          schema: { type: string, enum: [ active, finished, cancelled ] }
+        - name: deadlineFrom
+          in: query
+          schema: { type: string, example: "2026-09-20" }
+        - name: deadlineTo
+          in: query
+          schema: { type: string, example: "2026-09-20" }
+        - name: includeAll
+          in: query
+          description: 是否返回全部项目
+          schema: { type: boolean, default: false }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 10 }
+      responses:
+        "200":
+          description: 获取项目列表成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: "#/components/schemas/Project" }
+                          page: { $ref: "#/components/schemas/PageMeta" }
+    post:
+      tags: [ Project ]
+      summary: 管理员发布项目
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ name, deadline, assignments ]
+              properties:
+                name: { type: string, maxLength: 50, example: 第七次人物专访 }
+                description: { type: string, maxLength: 1000 }
+                deadline: { type: string, example: "2026-09-20T23:59:59+08:00" }
+                semesterIds:
+                  type: array
+                  items: { type: integer }
+                tagIds:
+                  type: array
+                  items: { type: integer }
+                assignments:
+                  type: array
+                  items: { $ref: "#/components/schemas/AssignmentInput" }
+      responses:
+        "201":
+          description: 发布项目成功
+        "403": { description: 无权限发布项目 }
+
+  /api/projects/{id}:
+    get:
+      tags: [ Project ]
+      summary: 获取项目详情
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: 获取项目详情成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Project" }
+        "404": { description: 项目不存在或无权访问 }
+    patch:
+      tags: [ Project ]
+      summary: 管理员修改项目
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                deadline: { type: string }
+                status: { type: string, enum: [ active, finished, cancelled ] }
+                semesterIds: { type: array, items: { type: integer } }
+                tagIds: { type: array, items: { type: integer } }
+                assignments:
+                  type: array
+                  description: 分工列表整体覆盖更新
+                  items: { $ref: "#/components/schemas/AssignmentInput" }
+      responses:
+        "200": { description: 修改项目成功 }
+    delete:
+      tags: [ Project ]
+      summary: 管理员删除项目
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ confirm, reason ]
+              properties:
+                confirm: { type: boolean, description: 是否确认删除 }
+                reason: { type: string, description: 删除原因 }
+      responses:
+        "200": { description: 删除项目成功 }
+        "400": { description: 未确认删除或缺少删除原因 }
+
+  /api/projects/{id}/status:
+    patch:
+      tags: [ Project ]
+      summary: 管理员切换项目状态
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ status ]
+              properties:
+                status: { type: string, enum: [ active, finished, cancelled ] }
+      responses:
+        "200": { description: 切换项目状态成功 }
+
+  /api/projects/{id}/discussions:
+    post:
+      tags: [ Project ]
+      summary: 发表讨论
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ content ]
+              properties:
+                content: { type: string, maxLength: 1000 }
+      responses:
+        "201": { description: 发表讨论成功 }
+        "403": { description: 非管理员且非项目成员 }
+
+  /api/discussions/{id}:
+    patch:
+      tags: [ Project ]
+      summary: 编辑讨论
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ content ]
+              properties:
+                content: { type: string, maxLength: 1000 }
+      responses:
+        "200": { description: 编辑讨论成功 }
+    delete:
+      tags: [ Project ]
+      summary: 删除讨论
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: 删除讨论成功 }
+
+  /api/assignments/{id}/claim:
+    post:
+      tags: [ Claim ]
+      summary: 申领分工
+      parameters:
+        - $ref: "#/components/parameters/AssignmentId"
+      responses:
+        "200":
+          description: 申领分工成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Assignment" }
+        "409": { description: 名额已满或已申领或项目已结束 }
+    delete:
+      tags: [ Claim ]
+      summary: 取消申领分工
+      parameters:
+        - $ref: "#/components/parameters/AssignmentId"
+      responses:
+        "200": { description: 取消申领成功 }
+        "409": { description: 未申领该分工 }
+
+  /api/assignments/{id}/assign:
+    post:
+      tags: [ Claim ]
+      summary: 管理员指派成员
+      parameters:
+        - $ref: "#/components/parameters/AssignmentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ studentIds ]
+              properties:
+                studentIds:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200": { description: 指派成员成功 }
+        "403": { description: 无权限指派成员 }
+
+  /api/assignments/{id}/members:
+    get:
+      tags: [ Claim ]
+      summary: 获取分工负责人名单
+      parameters:
+        - $ref: "#/components/parameters/AssignmentId"
+      responses:
+        "200": { description: 获取负责人名单成功 }
+
+  /api/my/tasks:
+    get:
+      tags: [ Claim ]
+      summary: 获取我的任务
+      parameters:
+        - name: keyword
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 10 }
+      responses:
+        "200": { description: 获取我的任务成功 }
+
+  /api/semesters:
+    get:
+      tags: [ Tag ]
+      summary: 获取学期列表
+      responses:
+        "200": { description: 获取学期列表成功 }
+    post:
+      tags: [ Tag ]
+      summary: 管理员创建学期
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ name ]
+              properties:
+                name: { type: string, maxLength: 50, example: 2026秋 }
+      responses:
+        "201": { description: 创建学期成功 }
+        "409": { description: 学期名称已存在 }
+
+  /api/semesters/{id}:
+    patch:
+      tags: [ Tag ]
+      summary: 管理员重命名学期
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ name ]
+              properties:
+                name: { type: string }
+      responses:
+        "200": { description: 重命名学期成功 }
+    delete:
+      tags: [ Tag ]
+      summary: 管理员删除学期
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: 删除学期成功 }
+
+  /api/tags:
+    get:
+      tags: [ Tag ]
+      summary: 获取标签列表
+      parameters:
+        - name: type
+          in: query
+          schema: { type: string, enum: [ semester, project, division ] }
+      responses:
+        "200": { description: 获取标签列表成功 }
+    post:
+      tags: [ Tag ]
+      summary: 管理员创建标签
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ name, type ]
+              properties:
+                name: { type: string, maxLength: 50 }
+                type: { type: string, enum: [ project, division ] }
+      responses:
+        "201": { description: 创建标签成功 }
+
+  /api/tags/{id}:
+    patch:
+      tags: [ Tag ]
+      summary: 管理员重命名标签
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ name ]
+              properties:
+                name: { type: string }
+      responses:
+        "200": { description: 重命名标签成功 }
+    delete:
+      tags: [ Tag ]
+      summary: 管理员删除标签
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: 删除标签成功 }
+
+  /api/notifications:
+    get:
+      tags: [ Notification ]
+      summary: 获取短信列表
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 10 }
+      responses:
+        "200":
+          description: 获取短信列表成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: "#/components/schemas/Notification" }
+                          page: { $ref: "#/components/schemas/PageMeta" }
+                          unreadCount: { type: integer }
+    delete:
+      tags: [ Notification ]
+      summary: 清空全部短信
+      responses:
+        "200": { description: 清空短信成功 }
+
+  /api/notifications/read-all:
+    patch:
+      tags: [ Notification ]
+      summary: 全部标记已读
+      responses:
+        "200": { description: 标记已读成功 }
+
+  /api/notifications/{id}/read:
+    patch:
+      tags: [ Notification ]
+      summary: 标记短信已读
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: 标记已读成功 }
+
+  /api/notifications/{id}:
+    delete:
+      tags: [ Notification ]
+      summary: 删除短信
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: 删除短信成功 }
+
+  /api/notifications/batch-delete:
+    post:
+      tags: [ Notification ]
+      summary: 批量删除短信
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ ids ]
+              properties:
+                ids: { type: array, items: { type: integer } }
+      responses:
+        "200": { description: 删除短信成功 }
+
+  /api/admin/members:
+    get:
+      tags: [ User ]
+      summary: 管理员获取成员列表
+      parameters:
+        - name: keyword
+          in: query
+          schema: { type: string }
+        - name: role
+          in: query
+          schema: { type: integer, enum: [ 0, 1, 2 ] }
+        - name: banned
+          in: query
+          schema: { type: boolean }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 10 }
+      responses:
+        "200": { description: 获取成员列表成功 }
+    post:
+      tags: [ User ]
+      summary: 管理员批量新增账号
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ studentIds ]
+              properties:
+                studentIds: { type: array, items: { type: string } }
+                name: { type: string, description: 成员姓名 }
+                phone: { type: string }
+                wechat: { type: string }
+                qq: { type: string }
+                email: { type: string }
+                role: { type: integer, enum: [ 1, 2 ], description: 账号角色 }
+      responses:
+        "200":
+          description: 批量新增账号成功
+        "403": { description: 无权限创建管理员账号 }
+
+  /api/admin/members/{studentId}:
+    get:
+      tags: [ User ]
+      summary: 管理员获取成员详情
+      parameters:
+        - $ref: "#/components/parameters/StudentId"
+      responses:
+        "200": { description: 获取成员详情成功 }
+    patch:
+      tags: [ User ]
+      summary: 管理员修改成员信息
+      parameters:
+        - $ref: "#/components/parameters/StudentId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                phone: { type: string }
+                wechat: { type: string }
+                qq: { type: string }
+                email: { type: string }
+      responses:
+        "200": { description: 修改成员信息成功 }
+    delete:
+      tags: [ User ]
+      summary: 管理员删除账号
+      description: 内置超管与当前登录账号不可删除
+      parameters:
+        - $ref: "#/components/parameters/StudentId"
+      responses:
+        "200": { description: 删除账号成功 }
+        "403": { description: 无权限删除管理员账号 }
+        "409": { description: 内置超管或当前登录账号不可删除 }
+
+  /api/admin/members/{studentId}/ban:
+    patch:
+      tags: [ User ]
+      summary: 管理员封禁或解封成员
+      parameters:
+        - $ref: "#/components/parameters/StudentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ banned ]
+              properties:
+                banned: { type: boolean }
+      responses:
+        "200": { description: 封禁或解封成员成功 }
+        "403": { description: 无权限封禁或解封成员 }
+
+  /api/admin/members/{studentId}/password/reset:
+    post:
+      tags: [ User ]
+      summary: 管理员重置成员密码
+      parameters:
+        - $ref: "#/components/parameters/StudentId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newPassword: { type: string, description: 新密码为空时按 Fdu 加学号后五位生成 }
+      responses:
+        "200": { description: 重置密码成功 }
+
+  /api/admin/admins:
+    post:
+      tags: [ User ]
+      summary: 超级管理员创建管理员账号
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ studentIds ]
+              properties:
+                studentIds: { type: array, items: { type: string } }
+                role: { type: integer, enum: [ 1 ], default: 1 }
+      responses:
+        "200": { description: 创建管理员账号成功 }
+        "403": { description: 无权限创建管理员账号 }
+
+  /api/admin/logs:
+    get:
+      tags: [ OperationLog ]
+      summary: 管理员查询操作日志
+      parameters:
+        - name: operatorId
+          in: query
+          schema: { type: string }
+        - name: type
+          in: query
+          description: 操作类型筛选
+          schema:
+            type: string
+            enum:
+              - claim_assignment
+              - cancel_assignment
+              - create_project
+              - update_project
+              - delete_project
+              - assign_assignment
+              - create_account
+              - update_member
+              - delete_member
+              - reset_password
+              - ban_account
+              - unban_account
+              - create_admin
+              - delete_admin
+              - create_tag
+              - rename_tag
+              - delete_tag
+              - create_semester
+              - rename_semester
+              - delete_semester
+              - clear_operation_log
+        - name: targetType
+          in: query
+          schema:
+            type: string
+            enum: [ user, project, assignment, tag, semester, operation_log ]
+        - name: targetId
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string }
+        - name: to
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 10 }
+      responses:
+        "200": { description: 获取操作日志成功 }
+
+  /api/admin/logs/batch-delete:
+    post:
+      tags: [ OperationLog ]
+      summary: 管理员删除操作日志
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ ids ]
+              properties:
+                ids: { type: array, items: { type: integer } }
+      responses:
+        "200": { description: 删除操作日志成功 }
+
+  /api/admin/logs/clear:
+    post:
+      tags: [ OperationLog ]
+      summary: 管理员清理操作日志
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                from: { type: string, example: "2026-09-20" }
+                to: { type: string, example: "2026-09-20" }
+      responses:
+        "200": { description: 清理操作日志成功 }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+    ProjectId:
+      name: id
+      in: path
+      required: true
+      description: 项目 ID
+      schema: { type: integer }
+    AssignmentId:
+      name: id
+      in: path
+      required: true
+      description: 分工 ID
+      schema: { type: integer }
+    StudentId:
+      name: studentId
+      in: path
+      required: true
+      description: 学号
+      schema: { type: string }
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        code: { type: string, example: "OK" }
+        message: { type: string, example: 成功 }
+        data: { nullable: true }
+
+    PageMeta:
+      type: object
+      properties:
+        page: { type: integer, example: 1 }
+        size: { type: integer, example: 10 }
+        total: { type: integer, example: 25 }
+        totalPages: { type: integer, example: 3 }
+
+    AuthResult:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        tokenType: { type: string, example: Bearer }
+        expiresIn: { type: integer, description: 访问令牌有效秒数 }
+        user: { $ref: "#/components/schemas/User" }
+
+    User:
+      type: object
+      properties:
+        studentId: { type: string, description: 学号 }
+        name: { type: string }
+        phone: { type: string, description: 手机号 }
+        wechat: { type: string, description: 微信号 }
+        qq: { type: string, description: QQ 号 }
+        email: { type: string, description: 邮箱 }
+        role: { type: integer, enum: [ 0, 1, 2 ], description: 账号角色 }
+        roleName: { type: string }
+        mustChangePassword:
+          type: boolean
+          description: 是否要求首次改密
+        banned: { type: boolean }
+        bannedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        masked: { type: boolean, description: 是否隐藏敏感字段 }
+
+    Tag:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        type: { type: string, enum: [ semester, project, division ] }
+
+    Semester:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+
+    AssignmentInput:
+      type: object
+      required: [ name, capacity ]
+      properties:
+        id: { type: integer, nullable: true, description: 分工 ID 修改时携带 }
+        name: { type: string, maxLength: 50, example: 准备工作 }
+        description: { type: string, maxLength: 1000, description: 分工描述 }
+        capacity: { type: integer, example: 3, description: 负责人总人数 }
+        tagId: { type: integer, nullable: true }
+        deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: 分工截止时间
+
+    Assignment:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string, description: 分工描述 }
+        tagId: { type: integer, nullable: true }
+        capacity: { type: integer }
+        claimedCount: { type: integer }
+        remaining: { type: integer }
+        full: { type: boolean }
+        deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: 分工截止时间
+        mine: { type: boolean, description: 当前用户是否已申领 }
+        members:
+          type: array
+          description: 负责人明细
+          items: { $ref: "#/components/schemas/Member" }
+
+    Member:
+      type: object
+      properties:
+        studentId: { type: string }
+        studentName: { type: string }
+        assigned: { type: boolean, description: 是否管理员指派 }
+        assignedBy: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    Discussion:
+      type: object
+      properties:
+        id: { type: integer }
+        authorId: { type: string }
+        authorName: { type: string }
+        content: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        editable: { type: boolean, description: 当前用户可编辑或删除 }
+
+    Project:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        deadline: { type: string, format: date-time }
+        status: { type: string, enum: [ active, finished, cancelled ] }
+        statusName: { type: string, example: 进行中 }
+        creatorId: { type: string }
+        creatorName: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        semesters:
+          type: array
+          items: { $ref: "#/components/schemas/Semester" }
+        tags:
+          type: array
+          items: { $ref: "#/components/schemas/Tag" }
+        assignments:
+          type: array
+          items: { $ref: "#/components/schemas/Assignment" }
+        discussions:
+          type: array
+          description: 项目讨论列表
+          items: { $ref: "#/components/schemas/Discussion" }
+        discussionCount: { type: integer }
+        totalCapacity: { type: integer }
+        totalClaimed: { type: integer }
+        mine: { type: boolean, description: 当前用户是否参与该项目 }
+        myAssignmentIds:
+          type: array
+          items: { type: integer }
+
+    Notification:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        content: { type: string }
+        read: { type: boolean }
+        type: { type: string, enum: [ project_published, assigned ] }
+        projectId: { type: integer, nullable: true }
+        assignmentId: { type: integer, nullable: true }
+        createdAt: { type: string, format: date-time }

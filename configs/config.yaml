@@ -1,0 +1,21 @@
+server:
+  host: 0.0.0.0
+  port: 8080
+  mode: debug
+
+database:
+  path: data/eworkspace.db
+
+jwt:
+  secret: please-change-me-in-production
+  access_ttl_minutes: 30
+  refresh_ttl_hours: 168
+
+log:
+  level: info
+  format: text
+
+bootstrap:
+  super_admin_student_id: "0"
+  super_admin_name: 超级管理员
+  super_admin_password: ""
