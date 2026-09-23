@@ -168,7 +168,7 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 			Name:        a.Name,
 			Description: a.Description,
 			Capacity:    a.Capacity,
-			Workload:    workloadOf(a.Workload),
+			Workload:    a.Workload,
 			TagID:       a.TagID,
 			Deadline:    deadline,
 		})
@@ -237,7 +237,7 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 				Name:        a.Name,
 				Description: a.Description,
 				Capacity:    a.Capacity,
-				Workload:    workloadOf(a.Workload),
+				Workload:    a.Workload,
 				TagID:       a.TagID,
 				Deadline:    deadline,
 			})
@@ -514,13 +514,6 @@ func (h *ProjectHandler) DeleteDiscussion(c *gin.Context) {
 		return
 	}
 	OK(c, gin.H{"id": discussionID, "deleted": true})
-}
-
-func workloadOf(raw *int) int {
-	if raw == nil {
-		return 1
-	}
-	return *raw
 }
 
 func parseTimeQuery(c *gin.Context, name string, endOfDay bool) (*time.Time, error) {

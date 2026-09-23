@@ -15,7 +15,7 @@ type AssignmentInput struct {
 	ID          *uint
 	Name        string
 	Capacity    int
-	Workload    int
+	Workload    *int
 	TagID       *uint
 	Description string
 	Deadline    *time.Time
@@ -253,11 +253,10 @@ func (s *projectService) Create(ctx context.Context, operator *model.User, in Cr
 		aName := c.Short(label+"名称", a.Name)
 		aDescription := c.Long(label+"描述", a.Description)
 		capacity := c.Positive(label+"人数", a.Capacity, 100)
-		workload := a.Workload
-		if workload <= 0 {
-			workload = 1
+		workload := 1
+		if a.Workload != nil {
+			workload = c.Positive(label+"工作量", *a.Workload, 999)
 		}
-		workload = c.Positive(label+"工作量", workload, 999)
 		if a.TagID != nil {
 			if _, err := s.repos.Tag.GetByID(ctx, *a.TagID); err != nil {
 				return nil, apperr.Internal(err)
@@ -267,7 +266,7 @@ func (s *projectService) Create(ctx context.Context, operator *model.User, in Cr
 			Name:        aName,
 			Description: aDescription,
 			Capacity:    capacity,
-			Workload:    workload,
+			Workload:    &workload,
 			TagID:       a.TagID,
 			Deadline:    a.Deadline,
 		})
@@ -359,11 +358,11 @@ func (s *projectService) Update(ctx context.Context, operator *model.User, id ui
 			aName := c.Short(label+"名称", a.Name)
 			aDescription := c.Long(label+"描述", a.Description)
 			capacity := c.Positive(label+"人数", a.Capacity, 100)
-			workload := a.Workload
-			if workload <= 0 {
-				workload = 1
+			var workload *int
+			if a.Workload != nil {
+				value := c.Positive(label+"工作量", *a.Workload, 999)
+				workload = &value
 			}
-			workload = c.Positive(label+"工作量", workload, 999)
 			if a.TagID != nil {
 				if _, err := s.repos.Tag.GetByID(ctx, *a.TagID); err != nil {
 					return nil, apperr.Internal(err)

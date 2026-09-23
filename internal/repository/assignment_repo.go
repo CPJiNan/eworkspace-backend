@@ -23,10 +23,17 @@ type AssignmentSpec struct {
 	ID          *uint
 	Name        string
 	Capacity    int
-	Workload    int
+	Workload    *int
 	TagID       *uint
 	Description string
 	Deadline    *time.Time
+}
+
+func workloadOr(workload *int) int {
+	if workload == nil {
+		return 1
+	}
+	return *workload
 }
 
 type AssignmentRepo interface {
@@ -100,7 +107,7 @@ func (r *assignmentRepo) CreateWithProject(ctx context.Context, project *model.P
 					Name:        spec.Name,
 					Description: spec.Description,
 					Capacity:    spec.Capacity,
-					Workload:    spec.Workload,
+					Workload:    workloadOr(spec.Workload),
 					TagID:       spec.TagID,
 					Deadline:    spec.Deadline,
 				}
@@ -150,7 +157,7 @@ func (r *assignmentRepo) UpdateWithProject(
 					Name:        spec.Name,
 					Description: spec.Description,
 					Capacity:    spec.Capacity,
-					Workload:    spec.Workload,
+					Workload:    workloadOr(spec.Workload),
 					TagID:       spec.TagID,
 					Deadline:    spec.Deadline,
 				}
@@ -171,16 +178,19 @@ func (r *assignmentRepo) UpdateWithProject(
 			if spec.Capacity < existing.ClaimedCount {
 				return fmt.Errorf("分工“%s”的人数不能少于已申领人数（%d）", existing.Name, existing.ClaimedCount)
 			}
+			updates := map[string]any{
+				"name":        spec.Name,
+				"description": spec.Description,
+				"capacity":    spec.Capacity,
+				"tag_id":      spec.TagID,
+				"deadline":    spec.Deadline,
+				"updated_at":  time.Now(),
+			}
+			if spec.Workload != nil {
+				updates["workload"] = *spec.Workload
+			}
 			if err := tx.Model(&model.Assignment{}).Where("id = ?", existing.ID).
-				Updates(map[string]any{
-					"name":        spec.Name,
-					"description": spec.Description,
-					"capacity":    spec.Capacity,
-					"workload":    spec.Workload,
-					"tag_id":      spec.TagID,
-					"deadline":    spec.Deadline,
-					"updated_at":  time.Now(),
-				}).Error; err != nil {
+				Updates(updates).Error; err != nil {
 				return err
 			}
 			keep = append(keep, existing.ID)
