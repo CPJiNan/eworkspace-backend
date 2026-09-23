@@ -705,18 +705,20 @@ paths:
                 wechat: { type: string }
                 qq: { type: string }
                 email: { type: string }
+                role: { type: integer, enum: [ 1, 2 ], description: 账号角色 }
       responses:
         "200": { description: 修改成员信息成功 }
+        "403": { description: 无权限修改账号角色 }
+        "409": { description: 超级管理员账号或当前登录账号不可修改 }
     delete:
       tags: [ User ]
       summary: 管理员删除账号
-      description: 内置超管与当前登录账号不可删除
       parameters:
         - $ref: "#/components/parameters/StudentId"
       responses:
         "200": { description: 删除账号成功 }
         "403": { description: 无权限删除管理员账号 }
-        "409": { description: 内置超管或当前登录账号不可删除 }
+        "409": { description: 超级管理员账号或当前登录账号不可删除 }
 
   /api/admin/members/{studentId}/ban:
     patch:

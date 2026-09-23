@@ -75,6 +75,7 @@ type UpdateUserInput struct {
 	WeChat *string
 	QQ     *string
 	Email  *string
+	Role   *model.Role
 }
 
 type ListUsersInput struct {
@@ -90,6 +91,7 @@ type UserService interface {
 	CreateAccounts(ctx context.Context, viewer *model.User, in CreateAccountInput) ([]CreateAccountResult, error)
 	Get(ctx context.Context, viewer *model.User, studentID string) (*UserDTO, error)
 	UpdateProfile(ctx context.Context, target *model.User, in UpdateUserInput) (*UserDTO, error)
+	UpdateMember(ctx context.Context, viewer *model.User, studentID string, in UpdateUserInput) (*UserDTO, bool, error)
 	SetBanned(ctx context.Context, viewer *model.User, studentID string, banned bool) error
 	ResetPassword(ctx context.Context, studentID, newPassword string) (string, error)
 	DeleteAccount(ctx context.Context, viewer *model.User, studentID string) error
@@ -153,7 +155,7 @@ func (s *userService) CreateAccounts(ctx context.Context, viewer *model.User,
 			return nil, apperr.ErrSuperAdminOnly
 		}
 		if role == model.RoleSuperAdmin {
-			return nil, apperr.Validation("超级管理员为系统内置账号，不允许创建")
+			return nil, apperr.Validation("无法创建超级管理员账号")
 		}
 	}
 
@@ -294,8 +296,84 @@ func (s *userService) UpdateProfile(ctx context.Context, target *model.User, in 
 	}
 
 	c := validate.New()
-	fields := map[string]any{}
+	fields := profileFields(c, current, in)
+	if c.HasError() {
+		return nil, apperr.Validation(c.Err())
+	}
+	if len(fields) == 0 {
+		return nil, apperr.Validation("没有需要修改的字段")
+	}
 
+	if err := s.repos.User.UpdateFields(ctx, current.StudentID, fields); err != nil {
+		return nil, apperr.Internal(err)
+	}
+	updated, err := s.repos.User.GetByID(ctx, current.StudentID)
+	if err != nil {
+		return nil, apperr.Internal(err)
+	}
+	dto := ToUserDTO(updated, false)
+	return &dto, nil
+}
+
+func (s *userService) UpdateMember(ctx context.Context, viewer *model.User, studentID string, in UpdateUserInput) (*UserDTO, bool, error) {
+	if !viewer.Role.CanManage() {
+		return nil, false, apperr.ErrForbidden
+	}
+	current, err := s.repos.User.GetByID(ctx, studentID)
+	if err != nil {
+		return nil, false, apperr.Internal(err)
+	}
+	if current == nil {
+		return nil, false, apperr.NotFound("账号不存在")
+	}
+
+	c := validate.New()
+	fields := profileFields(c, current, in)
+
+	roleChanged := false
+	if in.Role != nil {
+		if viewer.Role != model.RoleSuperAdmin {
+			return nil, false, apperr.ErrSuperAdminOnly
+		}
+		if current.StudentID == viewer.StudentID {
+			return nil, false, apperr.ErrCannotChangeSelfRole
+		}
+		if current.Role == model.RoleSuperAdmin {
+			return nil, false, apperr.ErrLastSuperAdmin
+		}
+		if !in.Role.IsValid() || *in.Role == model.RoleSuperAdmin {
+			return nil, false, apperr.Validation("角色取值不合法")
+		}
+		if *in.Role != current.Role {
+			fields["role"] = *in.Role
+			roleChanged = true
+		}
+	}
+	if c.HasError() {
+		return nil, false, apperr.Validation(c.Err())
+	}
+	if len(fields) == 0 {
+		return nil, false, apperr.Validation("没有需要修改的字段")
+	}
+
+	if err := s.repos.User.UpdateFields(ctx, studentID, fields); err != nil {
+		return nil, false, apperr.Internal(err)
+	}
+	if roleChanged {
+		if err := s.repos.RefreshToken.RevokeByUser(ctx, studentID); err != nil {
+			s.log.Warn("修改账号角色后撤销 Refresh Token 失败", "studentId", studentID, "err", err)
+		}
+	}
+	updated, err := s.repos.User.GetByID(ctx, studentID)
+	if err != nil {
+		return nil, false, apperr.Internal(err)
+	}
+	dto := ToUserDTO(updated, false)
+	return &dto, roleChanged, nil
+}
+
+func profileFields(c *validate.Checker, current *model.User, in UpdateUserInput) map[string]any {
+	fields := map[string]any{}
 	if in.Name != nil {
 		fields["name"] = c.Short("姓名", *in.Name)
 	}
@@ -315,22 +393,7 @@ func (s *userService) UpdateProfile(ctx context.Context, target *model.User, in 
 		}
 		fields["email"] = email
 	}
-	if c.HasError() {
-		return nil, apperr.Validation(c.Err())
-	}
-	if len(fields) == 0 {
-		return nil, apperr.Validation("没有需要修改的字段")
-	}
-
-	if err := s.repos.User.UpdateFields(ctx, current.StudentID, fields); err != nil {
-		return nil, apperr.Internal(err)
-	}
-	updated, err := s.repos.User.GetByID(ctx, current.StudentID)
-	if err != nil {
-		return nil, apperr.Internal(err)
-	}
-	dto := ToUserDTO(updated, false)
-	return &dto, nil
+	return fields
 }
 
 func (s *userService) SetBanned(ctx context.Context, viewer *model.User, studentID string, banned bool) error {

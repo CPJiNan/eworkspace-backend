@@ -20,6 +20,15 @@ type updateProfileRequest struct {
 	Email  *string `json:"email"`
 }
 
+type updateMemberRequest struct {
+	Name   *string     `json:"name"`
+	Phone  *string     `json:"phone"`
+	WeChat *string     `json:"wechat"`
+	QQ     *string     `json:"qq"`
+	Email  *string     `json:"email"`
+	Role   *model.Role `json:"role"`
+}
+
 type createAccountsRequest struct {
 	StudentIDs []string    `json:"studentIds"`
 	Name       string      `json:"name"`
@@ -183,24 +192,29 @@ func (h *UserHandler) UpdateMember(c *gin.Context) {
 	}
 	studentID := c.Param("studentId")
 
-	var req updateProfileRequest
+	var req updateMemberRequest
 	if err := bindJSON(c, &req); err != nil {
 		Fail(c, err)
 		return
 	}
 
-	updated, err := h.svc.User.UpdateProfile(c.Request.Context(), &model.User{StudentID: studentID}, service.UpdateUserInput{
+	updated, roleChanged, err := h.svc.User.UpdateMember(c.Request.Context(), actor, studentID, service.UpdateUserInput{
 		Name:   req.Name,
 		Phone:  req.Phone,
 		WeChat: req.WeChat,
 		QQ:     req.QQ,
 		Email:  req.Email,
+		Role:   req.Role,
 	})
 	if err != nil {
 		Fail(c, err)
 		return
 	}
-	h.writeLog(c, actor, model.OpUpdateMember, model.TargetUser, studentID, updated.Name, "")
+	detail := ""
+	if roleChanged {
+		detail = "身份调整为" + updated.RoleName
+	}
+	h.writeLog(c, actor, model.OpUpdateMember, model.TargetUser, studentID, updated.Name, detail)
 	OK(c, updated)
 }
 
