@@ -15,6 +15,7 @@ type AssignmentInput struct {
 	ID          *uint
 	Name        string
 	Capacity    int
+	Workload    int
 	TagID       *uint
 	Description string
 	Deadline    *time.Time
@@ -26,6 +27,7 @@ type AssignmentDTO struct {
 	Description  string      `json:"description"`
 	TagID        *uint       `json:"tagId,omitempty"`
 	Capacity     int         `json:"capacity"`
+	Workload     int         `json:"workload"`
 	ClaimedCount int         `json:"claimedCount"`
 	Remaining    int         `json:"remaining"`
 	Full         bool        `json:"full"`
@@ -251,6 +253,11 @@ func (s *projectService) Create(ctx context.Context, operator *model.User, in Cr
 		aName := c.Short(label+"名称", a.Name)
 		aDescription := c.Long(label+"描述", a.Description)
 		capacity := c.Positive(label+"人数", a.Capacity, 100)
+		workload := a.Workload
+		if workload <= 0 {
+			workload = 1
+		}
+		workload = c.Positive(label+"工作量", workload, 999)
 		if a.TagID != nil {
 			if _, err := s.repos.Tag.GetByID(ctx, *a.TagID); err != nil {
 				return nil, apperr.Internal(err)
@@ -260,6 +267,7 @@ func (s *projectService) Create(ctx context.Context, operator *model.User, in Cr
 			Name:        aName,
 			Description: aDescription,
 			Capacity:    capacity,
+			Workload:    workload,
 			TagID:       a.TagID,
 			Deadline:    a.Deadline,
 		})
@@ -351,6 +359,11 @@ func (s *projectService) Update(ctx context.Context, operator *model.User, id ui
 			aName := c.Short(label+"名称", a.Name)
 			aDescription := c.Long(label+"描述", a.Description)
 			capacity := c.Positive(label+"人数", a.Capacity, 100)
+			workload := a.Workload
+			if workload <= 0 {
+				workload = 1
+			}
+			workload = c.Positive(label+"工作量", workload, 999)
 			if a.TagID != nil {
 				if _, err := s.repos.Tag.GetByID(ctx, *a.TagID); err != nil {
 					return nil, apperr.Internal(err)
@@ -358,7 +371,7 @@ func (s *projectService) Update(ctx context.Context, operator *model.User, id ui
 			}
 			specs = append(specs, repository.AssignmentSpec{
 				ID: a.ID, Name: aName, Description: aDescription,
-				Capacity: capacity, TagID: a.TagID, Deadline: a.Deadline,
+				Capacity: capacity, Workload: workload, TagID: a.TagID, Deadline: a.Deadline,
 			})
 		}
 		preparedAssignments = &specs
@@ -538,6 +551,7 @@ func (s *projectService) assemble(ctx context.Context, viewer *model.User, proje
 			Description:  a.Description,
 			TagID:        a.TagID,
 			Capacity:     a.Capacity,
+			Workload:     a.Workload,
 			ClaimedCount: claimed,
 			Remaining:    maxInt(a.Capacity-claimed, 0),
 			Full:         claimed >= a.Capacity,

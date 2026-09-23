@@ -18,12 +18,19 @@ type MemberFilter struct {
 	Size         int
 }
 
+type WorkloadRow struct {
+	StudentID   string
+	StudentName string
+	Workload    int
+}
+
 type ProjectMemberRepo interface {
 	Get(ctx context.Context, assignmentID uint, studentID string) (*model.ProjectMember, error)
 	List(ctx context.Context, f MemberFilter) ([]model.ProjectMember, int64, error)
 	ListByAssignment(ctx context.Context, assignmentID uint) ([]model.ProjectMember, error)
 	ListByProject(ctx context.Context, projectID uint) ([]model.ProjectMember, error)
 	CountByProject(ctx context.Context, projectID uint, studentID string) (int64, error)
+	WorkloadRanking(ctx context.Context, semesterIDs []uint) ([]WorkloadRow, error)
 }
 
 type memberRepo struct{ db *gorm.DB }
@@ -105,6 +112,33 @@ func (r *memberRepo) CountByProject(ctx context.Context, projectID uint, student
 	err := r.db.WithContext(ctx).Model(&model.ProjectMember{}).
 		Where("project_id = ? AND student_id = ?", projectID, studentID).Count(&count).Error
 	return count, err
+}
+
+func (r *memberRepo) WorkloadRanking(ctx context.Context, semesterIDs []uint) ([]WorkloadRow, error) {
+	q := r.db.WithContext(ctx).Model(&model.ProjectMember{}).
+		Select(`project_members.student_id AS student_id,
+			MAX(project_members.student_name) AS student_name,
+			SUM(assignments.workload) AS workload`).
+		Joins("JOIN assignments ON assignments.id = project_members.assignment_id").
+		Joins("JOIN projects ON projects.id = project_members.project_id").
+		Where("projects.deleted_at IS NULL")
+	if len(semesterIDs) > 0 {
+		q = q.Where(`EXISTS (
+			SELECT 1 FROM project_semesters ps
+			WHERE ps.project_id = project_members.project_id
+			  AND ps.semester_id IN ?
+		)`, semesterIDs)
+	}
+
+	list := make([]WorkloadRow, 0)
+	err := q.Group("project_members.student_id").
+		Having("SUM(assignments.workload) > 0").
+		Order("workload DESC, project_members.student_id ASC").
+		Scan(&list).Error
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
 }
 
 type DiscussionRepo interface {

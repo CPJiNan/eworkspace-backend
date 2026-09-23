@@ -20,6 +20,7 @@ type assignmentPayload struct {
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
 	Capacity    int     `json:"capacity"`
+	Workload    *int    `json:"workload"`
 	TagID       *uint   `json:"tagId"`
 	Deadline    *string `json:"deadline"`
 }
@@ -167,6 +168,7 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 			Name:        a.Name,
 			Description: a.Description,
 			Capacity:    a.Capacity,
+			Workload:    workloadOf(a.Workload),
 			TagID:       a.TagID,
 			Deadline:    deadline,
 		})
@@ -235,6 +237,7 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 				Name:        a.Name,
 				Description: a.Description,
 				Capacity:    a.Capacity,
+				Workload:    workloadOf(a.Workload),
 				TagID:       a.TagID,
 				Deadline:    deadline,
 			})
@@ -422,6 +425,25 @@ func (h *ProjectHandler) MyTasks(c *gin.Context) {
 	OK(c, NewPageResult(items, meta))
 }
 
+func (h *ProjectHandler) WorkloadRanking(c *gin.Context) {
+	actor, err := mustUser(c)
+	if err != nil {
+		Fail(c, err)
+		return
+	}
+	semesterIDs, err := uintList(c, "semesterIds")
+	if err != nil {
+		Fail(c, err)
+		return
+	}
+	items, err := h.svc.Member.WorkloadRanking(c.Request.Context(), actor, semesterIDs)
+	if err != nil {
+		Fail(c, err)
+		return
+	}
+	OK(c, gin.H{"items": items})
+}
+
 func (h *ProjectHandler) AddDiscussion(c *gin.Context) {
 	actor, err := mustUser(c)
 	if err != nil {
@@ -492,6 +514,13 @@ func (h *ProjectHandler) DeleteDiscussion(c *gin.Context) {
 		return
 	}
 	OK(c, gin.H{"id": discussionID, "deleted": true})
+}
+
+func workloadOf(raw *int) int {
+	if raw == nil {
+		return 1
+	}
+	return *raw
 }
 
 func parseTimeQuery(c *gin.Context, name string, endOfDay bool) (*time.Time, error) {

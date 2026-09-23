@@ -34,12 +34,19 @@ type MyTasksInput struct {
 	Size    int
 }
 
+type WorkloadItem struct {
+	StudentID   string `json:"studentId"`
+	StudentName string `json:"studentName"`
+	Workload    int    `json:"workload"`
+}
+
 type MemberService interface {
 	Claim(ctx context.Context, operator *model.User, assignmentID uint) (*AssignmentDTO, error)
 	CancelClaim(ctx context.Context, operator *model.User, assignmentID uint) (*AssignmentDTO, error)
 	Assign(ctx context.Context, operator *model.User, assignmentID uint, in AssignInput) ([]MemberDTO, error)
 	MyTasks(ctx context.Context, operator *model.User, in MyTasksInput) ([]MemberView, PageMeta, error)
 	AssignmentMembers(ctx context.Context, operator *model.User, assignmentID uint) ([]MemberDTO, error)
+	WorkloadRanking(ctx context.Context, viewer *model.User, semesterIDs []uint) ([]WorkloadItem, error)
 }
 
 type memberService struct {
@@ -199,6 +206,27 @@ func (s *memberService) AssignmentMembers(ctx context.Context, operator *model.U
 		out = append(out, dto)
 	}
 	return out, nil
+}
+
+func (s *memberService) WorkloadRanking(ctx context.Context, viewer *model.User, semesterIDs []uint) ([]WorkloadItem, error) {
+	if viewer == nil {
+		return nil, apperr.ErrUnauthorized
+	}
+
+	rows, err := s.repos.Member.WorkloadRanking(ctx, semesterIDs)
+	if err != nil {
+		return nil, apperr.Internal(err)
+	}
+
+	items := make([]WorkloadItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, WorkloadItem{
+			StudentID:   row.StudentID,
+			StudentName: row.StudentName,
+			Workload:    row.Workload,
+		})
+	}
+	return items, nil
 }
 
 func (s *memberService) loadAssignment(ctx context.Context, assignmentID uint) (*model.Assignment, *model.Project, error) {

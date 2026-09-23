@@ -462,6 +462,18 @@ paths:
       responses:
         "200": { description: 获取我的任务成功 }
 
+  /api/workload/ranking:
+    get:
+      tags: [ Claim ]
+      summary: 获取工作量排行榜
+      parameters:
+        - name: semesterIds
+          in: query
+          schema: { type: string }
+          description: 统计学期
+      responses:
+        "200": { description: 获取排行榜成功 }
+
   /api/semesters:
     get:
       tags: [ Tag ]
@@ -960,6 +972,7 @@ components:
         name: { type: string, maxLength: 50, example: 准备工作 }
         description: { type: string, maxLength: 1000, description: 分工描述 }
         capacity: { type: integer, example: 3, description: 负责人总人数 }
+        workload: { type: integer, minimum: 1, maximum: 999, description: 工作量缺省为 1 }
         tagId: { type: integer, nullable: true }
         deadline:
           type: string
@@ -975,6 +988,7 @@ components:
         description: { type: string, description: 分工描述 }
         tagId: { type: integer, nullable: true }
         capacity: { type: integer }
+        workload: { type: integer, description: 工作量 }
         claimedCount: { type: integer }
         remaining: { type: integer }
         full: { type: boolean }

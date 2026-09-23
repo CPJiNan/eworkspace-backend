@@ -23,6 +23,7 @@ type AssignmentSpec struct {
 	ID          *uint
 	Name        string
 	Capacity    int
+	Workload    int
 	TagID       *uint
 	Description string
 	Deadline    *time.Time
@@ -70,7 +71,7 @@ func (r *assignmentRepo) Create(ctx context.Context, a *model.Assignment) error 
 func (r *assignmentRepo) Update(ctx context.Context, a *model.Assignment) error {
 	return wrapErr("更新分工", r.db.WithContext(ctx).Model(&model.Assignment{}).
 		Where("id = ?", a.ID).
-		Select("name", "description", "capacity", "tag_id", "deadline", "updated_at").
+		Select("name", "description", "capacity", "workload", "tag_id", "deadline", "updated_at").
 		Updates(a).Error)
 }
 
@@ -99,6 +100,7 @@ func (r *assignmentRepo) CreateWithProject(ctx context.Context, project *model.P
 					Name:        spec.Name,
 					Description: spec.Description,
 					Capacity:    spec.Capacity,
+					Workload:    spec.Workload,
 					TagID:       spec.TagID,
 					Deadline:    spec.Deadline,
 				}
@@ -148,6 +150,7 @@ func (r *assignmentRepo) UpdateWithProject(
 					Name:        spec.Name,
 					Description: spec.Description,
 					Capacity:    spec.Capacity,
+					Workload:    spec.Workload,
 					TagID:       spec.TagID,
 					Deadline:    spec.Deadline,
 				}
@@ -173,6 +176,7 @@ func (r *assignmentRepo) UpdateWithProject(
 					"name":        spec.Name,
 					"description": spec.Description,
 					"capacity":    spec.Capacity,
+					"workload":    spec.Workload,
 					"tag_id":      spec.TagID,
 					"deadline":    spec.Deadline,
 					"updated_at":  time.Now(),

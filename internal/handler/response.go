@@ -99,3 +99,21 @@ func uintQueryOptional(c *gin.Context, name string) (*uint, error) {
 	result := uint(v)
 	return &result, nil
 }
+
+func uintList(c *gin.Context, name string) ([]uint, error) {
+	raw := strings.TrimSpace(c.Query(name))
+	if raw == "" {
+		return nil, nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]uint, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		v, err := strconv.ParseUint(part, 10, 64)
+		if err != nil || v == 0 {
+			return nil, apperr.Validation("参数 " + name + " 不合法")
+		}
+		out = append(out, uint(v))
+	}
+	return out, nil
+}

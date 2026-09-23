@@ -70,6 +70,7 @@ type Assignment struct {
 	Name         string     `gorm:"type:varchar(50);not null" json:"name"`
 	Description  string     `gorm:"type:text" json:"description"`
 	Capacity     int        `gorm:"not null;default:1" json:"capacity"`
+	Workload     int        `gorm:"not null;default:1" json:"workload"`
 	ClaimedCount int        `gorm:"not null;default:0" json:"claimedCount"`
 	TagID        *uint      `gorm:"index" json:"tagId,omitempty"`
 	Deadline     *time.Time `gorm:"index" json:"deadline,omitempty"`

@@ -67,6 +67,7 @@ func New(cfg *config.Config, log *slog.Logger, svc *service.Service, h *handler.
 		locked.GET("/projects", h.Project.List)
 		locked.GET("/projects/:id", h.Project.Get)
 		locked.GET("/my/tasks", h.Project.MyTasks)
+		locked.GET("/workload/ranking", h.Project.WorkloadRanking)
 
 		locked.POST("/assignments/:id/claim", h.Project.Claim)
 		locked.DELETE("/assignments/:id/claim", h.Project.CancelClaim)
